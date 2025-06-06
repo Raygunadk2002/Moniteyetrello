@@ -87,8 +87,12 @@ if edited_columns != column_list:
     st.session_state.df = df
     df.to_csv(DATA_FILE, index=False)
 
+# Prepare board data for streamlit-sortables
 board = {c: df[df["Status"] == c]["Feature"].tolist() for c in column_list}
-new_board = sort_items(board, direction="horizontal", multi_containers=True)
+
+containers = [{"id": col, "children": items} for col, items in board.items()]
+sorted_containers = sort_items(containers, direction="horizontal", multi_containers=True)
+new_board = {c["id"]: c.get("children", []) for c in sorted_containers}
 
 for col in column_list:
     features = new_board.get(col, [])
