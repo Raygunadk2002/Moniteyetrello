@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from streamlit_dragdrop import drag_drop
+from streamlit_dnd import st_dnd
 
 DATA_FILE = "data/board.csv"
 
@@ -42,7 +42,7 @@ if st.sidebar.button("Add Feature") and new_feature:
 drag_data = {col: df[df['Status'] == col]['Feature'].tolist() for col in column_list}
 
 # Render drag and drop board
-result = drag_drop(drag_data, key="board")
+result = st_dnd(drag_data)
 
 # Update dataframe after drag-and-drop
 if result:
