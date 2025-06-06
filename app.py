@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import json
-from streamlit_elements import elements, mui, dashboard, sync
+from streamlit_sortables import sort_items
 
 DATA_FILE = "data/board.csv"
 COLUMNS_FILE = "data/columns.json"
@@ -17,7 +17,7 @@ if not os.path.exists("data"):
     os.makedirs("data")
 
 if not os.path.isfile(DATA_FILE):
-    df = pd.DataFrame(columns=['Feature', 'Status', 'Votes', 'Comments'])
+    df = pd.DataFrame(columns=["Feature", "Status", "Votes", "Comments"])
     df.to_csv(DATA_FILE, index=False)
 
 if not os.path.isfile(COLUMNS_FILE):
@@ -28,50 +28,72 @@ df = pd.read_csv(DATA_FILE)
 with open(COLUMNS_FILE) as f:
     column_list = json.load(f)
 
+if "df" not in st.session_state:
+    st.session_state.df = df
+
+if "columns" not in st.session_state:
+    st.session_state.columns = column_list
+
+df = st.session_state.df
+column_list = st.session_state.columns
+
 st.set_page_config(layout="wide")
 st.title("Trello-like Project Management")
 
-columns_input = st.sidebar.text_input("Columns (comma separated)", ",".join(column_list))
+columns_input = st.sidebar.text_input(
+    "Columns (comma separated)", ",".join(column_list)
+)
 if st.sidebar.button("Update Columns"):
     column_list = [c.strip() for c in columns_input.split(",") if c.strip()]
     if column_list:
+        st.session_state.columns = column_list
         with open(COLUMNS_FILE, "w") as f:
             json.dump(column_list, f)
         df.loc[~df["Status"].isin(column_list), "Status"] = column_list[0]
+        st.session_state.df = df
         df.to_csv(DATA_FILE, index=False)
 
 st.sidebar.header("Add New Feature")
 new_feature = st.sidebar.text_input("Feature Name")
 if st.sidebar.button("Add Feature") and new_feature:
     default_status = column_list[0] if column_list else ""
-    df = pd.concat([
-        df,
-        pd.DataFrame(
-            {
-                'Feature': [new_feature],
-                'Status': [default_status],
-                'Votes': [0],
-                'Comments': [""],
-            }
-        ),
-    ])
+    df = pd.concat(
+        [
+            df,
+            pd.DataFrame(
+                {
+                    "Feature": [new_feature],
+                    "Status": [default_status],
+                    "Votes": [0],
+                    "Comments": [""],
+                }
+            ),
+        ]
+    )
+    st.session_state.df = df
     df.to_csv(DATA_FILE, index=False)
 
-with elements("dashboard"):
-    col_width = max(1, 12 // len(column_list)) if column_list else 12
-    layout = [
-        {"i": col, "x": idx * col_width, "y": 0, "w": col_width, "h": 10}
-        for idx, col in enumerate(column_list)
-    ]
-    with dashboard.Grid(layout=layout, draggableHandle=".draggable"):
-        for col in column_list:
-            with mui.Paper(key=col, elevation=3, style={"padding": "1rem", "overflowY": "auto"}):
-                mui.Typography(col, variant="h6", className="draggable")
-                col_features = df[df['Status'] == col]
-                for idx, row in col_features.iterrows():
-                    with mui.Card(key=f"card_{idx}", style={"margin": "0.5rem"}):
-                        mui.CardContent(
-                            mui.Typography(row['Feature'], variant="body2"),
-                            mui.Button(f"Votes: {row['Votes']}", variant="outlined", size="small")
-                        )
-        sync()
+edited_columns = []
+for idx, col in enumerate(column_list):
+    new_title = st.text_input(f"Column {idx+1}", col, key=f"col_name_{idx}")
+    edited_columns.append(new_title)
+
+if edited_columns != column_list:
+    column_list = edited_columns
+    st.session_state.columns = column_list
+    with open(COLUMNS_FILE, "w") as f:
+        json.dump(column_list, f)
+    df.loc[~df["Status"].isin(column_list), "Status"] = column_list[0]
+    st.session_state.df = df
+    df.to_csv(DATA_FILE, index=False)
+
+board = {c: df[df["Status"] == c]["Feature"].tolist() for c in column_list}
+new_board = sort_items(board, direction="horizontal", multi_containers=True)
+
+for col in column_list:
+    features = new_board.get(col, [])
+    df.loc[df["Feature"].isin(features), "Status"] = col
+
+st.session_state.df = df
+df.to_csv(DATA_FILE, index=False)
+
