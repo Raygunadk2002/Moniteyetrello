@@ -2,11 +2,10 @@
 import streamlit as st
 import pandas as pd
 import os
-from streamlit_sortables import sort_items
+from streamlit_elements import elements, mui, dashboard, sync
 
 DATA_FILE = "data/board.csv"
 
-# Initialize data
 if not os.path.exists("data"):
     os.makedirs("data")
 
@@ -16,53 +15,27 @@ if not os.path.isfile(DATA_FILE):
 
 df = pd.read_csv(DATA_FILE)
 
+st.set_page_config(layout="wide")
 st.title("Trello-like Project Management")
 
-# Sidebar settings
-columns = st.sidebar.text_input(
-    "Set columns (comma separated)", 
-    "new project/feature,being built,in testing,deployed"
-)
+columns = st.sidebar.text_input("Columns", "new project/feature,being built,in testing,deployed")
 column_list = [col.strip() for col in columns.split(",")]
 
-# Add new feature
 st.sidebar.header("Add New Feature")
 new_feature = st.sidebar.text_input("Feature Name")
 if st.sidebar.button("Add Feature") and new_feature:
-    new_row = pd.DataFrame({
-        'Feature': [new_feature],
-        'Status': [column_list[0]],
-        'Votes': [0],
-        'Comments': [""]
-    })
-    df = pd.concat([df, new_row], ignore_index=True)
+    df = pd.concat([df, pd.DataFrame({'Feature': [new_feature], 'Status': [column_list[0]], 'Votes': [0], 'Comments': [""]})])
     df.to_csv(DATA_FILE, index=False)
 
-# Prepare drag-and-drop interface
-sorted_features = {}
-for col in column_list:
-    col_features = df[df['Status'] == col]['Feature'].tolist()
-    sorted_features[col] = sort_items(col_features, header=col, direction='vertical')
-
-# Update dataframe after sorting
-for col, features in sorted_features.items():
-    for feature in features:
-        df.loc[df['Feature'] == feature, 'Status'] = col
-df.to_csv(DATA_FILE, index=False)
-
-# Feature details (votes/comments)
-for col in column_list:
-    st.subheader(col)
-    col_features = df[df['Status'] == col]
-    for idx, row in col_features.iterrows():
-        with st.expander(row['Feature']):
-            if st.button(f"Vote ({row['Votes']})", key=f"vote_{idx}"):
-                df.at[idx, 'Votes'] += 1
-                df.to_csv(DATA_FILE, index=False)
-                st.experimental_rerun()
-            new_comment = st.text_input("New comment", key=f"comment_{idx}")
-            if st.button("Add Comment", key=f"add_comment_{idx}") and new_comment:
-                df.at[idx, 'Comments'] += f"\n{new_comment}"
-                df.to_csv(DATA_FILE, index=False)
-                st.experimental_rerun()
-            st.write("Comments:", (row['Comments'] if pd.notna(row['Comments']) else "").replace("\n", "\n- "))
+with elements("dashboard"):
+    with dashboard.Grid(layout=[{"i": col, "x": idx, "y": 0, "w": 1, "h": 10} for idx, col in enumerate(column_list)], draggableHandle=".draggable"):
+        for col in column_list:
+            with mui.Paper(key=col, elevation=3, style={"padding": "1rem", "overflowY": "auto"}):
+                mui.Typography(col, variant="h6", className="draggable")
+                col_features = df[df['Status'] == col]
+                for idx, row in col_features.iterrows():
+                    with mui.Card(key=f"card_{idx}", style={"margin": "0.5rem"}):
+                        mui.CardContent(
+                            mui.Typography(row['Feature'], variant="body2"),
+                            mui.Button(f"Votes: {row['Votes']}", variant="outlined", size="small")
+                        )
