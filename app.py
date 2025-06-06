@@ -91,7 +91,11 @@ if edited_columns != column_list:
 board = {c: df[df["Status"] == c]["Feature"].tolist() for c in column_list}
 
 containers = [{"id": col, "children": items} for col, items in board.items()]
-sorted_containers = sort_items(containers, direction="horizontal", multi_containers=True)
+sorted_containers = sort_items(
+    containers,
+    direction="vertical",  # display columns horizontally with vertical lists
+    multi_containers=True,
+)
 new_board = {c["id"]: c.get("children", []) for c in sorted_containers}
 
 for col in column_list:
