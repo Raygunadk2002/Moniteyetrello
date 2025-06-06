@@ -46,7 +46,8 @@ for idx, col_name in enumerate(column_list):
                 df.at[i, 'Comments'] += f"\n{comment}"
                 df.to_csv(DATA_FILE, index=False)
                 st.experimental_rerun()
-            st.write("Comments:", row['Comments'].replace("\n", "\n- "))
+            comments = row['Comments'] if pd.notna(row['Comments']) else ""
+            st.write("Comments:", comments.replace("\n", "\n- "))
 
         # Move features between columns
         move_feature = st.selectbox(f"Move Feature from {col_name}", ["-"] + list(col_df['Feature']), key=f"move_{idx}")
