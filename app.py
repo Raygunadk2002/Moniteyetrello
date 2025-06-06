@@ -2,9 +2,11 @@
 import streamlit as st
 import pandas as pd
 import os
+from streamlit_dragdrop import drag_drop
 
 DATA_FILE = "data/board.csv"
 
+# Initialize data
 if not os.path.exists("data"):
     os.makedirs("data")
 
@@ -16,44 +18,52 @@ df = pd.read_csv(DATA_FILE)
 
 st.title("Trello-like Project Management")
 
-# Column configuration
-columns = st.sidebar.text_input("Set columns (comma separated)", "new project/feature,being built,in testing,deployed")
+# Sidebar settings
+columns = st.sidebar.text_input(
+    "Set columns (comma separated)", 
+    "new project/feature,being built,in testing,deployed"
+)
 column_list = [col.strip() for col in columns.split(",")]
 
 # Add new feature
 st.sidebar.header("Add New Feature")
 new_feature = st.sidebar.text_input("Feature Name")
 if st.sidebar.button("Add Feature") and new_feature:
-    df = df.append({'Feature': new_feature, 'Status': column_list[0], 'Votes': 0, 'Comments': ""}, ignore_index=True)
+    new_row = pd.DataFrame({
+        'Feature': [new_feature],
+        'Status': [column_list[0]],
+        'Votes': [0],
+        'Comments': [""]
+    })
+    df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
 
-# Display columns
-col_objs = st.columns(len(column_list))
+# Prepare data for drag and drop
+drag_data = {col: df[df['Status'] == col]['Feature'].tolist() for col in column_list}
 
-for idx, col_name in enumerate(column_list):
-    with col_objs[idx]:
-        st.subheader(col_name)
-        col_df = df[df['Status'] == col_name]
-        for i, row in col_df.iterrows():
-            st.write(f"### {row['Feature']}")
-            if st.button(f"Vote ({row['Votes']})", key=f"vote_{i}"):
-                df.at[i, 'Votes'] += 1
+# Render drag and drop board
+result = drag_drop(drag_data, key="board")
+
+# Update dataframe after drag-and-drop
+if result:
+    for col, features in result.items():
+        for feature in features:
+            df.loc[df['Feature'] == feature, 'Status'] = col
+    df.to_csv(DATA_FILE, index=False)
+
+# Feature details (votes/comments)
+for col in column_list:
+    st.subheader(col)
+    col_features = df[df['Status'] == col]
+    for idx, row in col_features.iterrows():
+        with st.expander(row['Feature']):
+            if st.button(f"Vote ({row['Votes']})", key=f"vote_{idx}"):
+                df.at[idx, 'Votes'] += 1
                 df.to_csv(DATA_FILE, index=False)
                 st.experimental_rerun()
-
-            comment = st.text_input("Comment", key=f"comment_{i}")
-            if st.button("Add Comment", key=f"add_comment_{i}") and comment:
-                df.at[i, 'Comments'] += f"\n{comment}"
+            new_comment = st.text_input("New comment", key=f"comment_{idx}")
+            if st.button("Add Comment", key=f"add_comment_{idx}") and new_comment:
+                df.at[idx, 'Comments'] += f"\n{new_comment}"
                 df.to_csv(DATA_FILE, index=False)
                 st.experimental_rerun()
-            comments = row['Comments'] if pd.notna(row['Comments']) else ""
-            st.write("Comments:", comments.replace("\n", "\n- "))
-
-        # Move features between columns
-        move_feature = st.selectbox(f"Move Feature from {col_name}", ["-"] + list(col_df['Feature']), key=f"move_{idx}")
-        if move_feature != "-":
-            target_col = st.selectbox("Target Column", [col for col in column_list if col != col_name], key=f"target_{idx}")
-            if st.button("Move", key=f"move_btn_{idx}"):
-                df.loc[df['Feature'] == move_feature, 'Status'] = target_col
-                df.to_csv(DATA_FILE, index=False)
-                st.experimental_rerun()
+            st.write("Comments:", (row['Comments'] if pd.notna(row['Comments']) else "").replace("\n", "\n- "))
