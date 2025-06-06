@@ -90,9 +90,13 @@ if edited_columns != column_list:
 # Prepare board data for streamlit-sortables
 board = {c: df[df["Status"] == c]["Feature"].tolist() for c in column_list}
 
-containers = [{"id": col, "children": items} for col, items in board.items()]
-sorted_containers = sort_items(containers, direction="horizontal", multi_containers=True)
-new_board = {c["id"]: c.get("children", []) for c in sorted_containers}
+containers = [{"id": col, "items": items} for col, items in board.items()]
+sorted_containers = sort_items(
+    containers,
+    direction="horizontal",
+    multi_containers=True,
+)
+new_board = {c["id"]: c.get("items", []) for c in sorted_containers}
 
 for col in column_list:
     features = new_board.get(col, [])
