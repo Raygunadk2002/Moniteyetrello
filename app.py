@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from streamlit_dnd import st_dnd
+from streamlit_sortables import sort_items
 
 DATA_FILE = "data/board.csv"
 
@@ -38,18 +38,17 @@ if st.sidebar.button("Add Feature") and new_feature:
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
 
-# Prepare data for drag and drop
-drag_data = {col: df[df['Status'] == col]['Feature'].tolist() for col in column_list}
+# Prepare drag-and-drop interface
+sorted_features = {}
+for col in column_list:
+    col_features = df[df['Status'] == col]['Feature'].tolist()
+    sorted_features[col] = sort_items(col_features, header=col, direction='vertical')
 
-# Render drag and drop board
-result = st_dnd(drag_data)
-
-# Update dataframe after drag-and-drop
-if result:
-    for col, features in result.items():
-        for feature in features:
-            df.loc[df['Feature'] == feature, 'Status'] = col
-    df.to_csv(DATA_FILE, index=False)
+# Update dataframe after sorting
+for col, features in sorted_features.items():
+    for feature in features:
+        df.loc[df['Feature'] == feature, 'Status'] = col
+df.to_csv(DATA_FILE, index=False)
 
 # Feature details (votes/comments)
 for col in column_list:
